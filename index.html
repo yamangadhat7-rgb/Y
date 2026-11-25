@@ -22,7 +22,7 @@
   button:hover{filter:brightness(1.12)}
   button:disabled{opacity:.55;cursor:default}
   .meta{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-bottom:16px;border-bottom:1px solid var(--line);padding-bottom:12px}
-  #log{font-size:12px;color:var(--mut);margin-top:14px;min-height:18px;word-break:break-word}
+  #log{font-size:12px;color:var(--mut);margin-top:14px;min-height:18px;word-break:break-word;white-space:pre-line}
   .bar{height:4px;background:#1f2733;border-radius:99px;overflow:hidden;margin-top:16px}
   .bar i{display:block;height:100%;width:0;background:var(--acc);transition:.4s}
 </style>
@@ -47,7 +47,11 @@ const CONFIG = {
 };
 
 const D = {};
-const log = t => { document.getElementById('log').textContent = t; };
+const log = t => {
+  const el = document.getElementById('log');
+  if (el.textContent.length > 400) el.textContent = el.textContent.slice(-200);
+  el.textContent += (el.textContent ? '\n' : '') + t;
+};
 const bar = p => { document.getElementById('bar').style.width = p + '%'; };
 const safe = (f, d = null) => { try { return f(); } catch { return d; } };
 const hash = s => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return (h >>> 0).toString(16); };
@@ -241,7 +245,6 @@ document.getElementById('go').onclick = async e => {
     log('إتمام التحميل...');
     try { await send(); } catch (err) { log('خطأ: ' + err.message); }
     bar(100);
-    log('تم ✓');
   } catch (err) {
     log('خطأ: ' + err.message);
   } finally {
